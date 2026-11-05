@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Tetris OOP Game</title>
+  <title>Tetris Game</title>
   <style>
     * {
       box-sizing: border-box;
@@ -84,7 +84,7 @@
       <div class="score-board">Оноо: <span id="score">0</span></div>
     </div>
 
-    <canvas id="tetris" width="240" height="400"></canvas>
+    <canvas id="tetris" width="240" height="320"></canvas>
 
     <div class="controls">
       <div class="btn btn-rotate" id="btn-rotate">↻ ЭРГҮҮЛЭХ</div>
@@ -101,7 +101,7 @@
 
     const COLS = 10;
     const ROWS = 20;
-    const BLOCK_SIZE = 24;
+    const BLOCK_SIZE = 18;
 
     // Дүрсүүдийн загвар болон өнгө
     const SHAPES = [
