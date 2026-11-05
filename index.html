@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <!-- Утасны дэлгэцэнд тааруулах ба сунгахаас сэргийлэх -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Brick Breaker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            touch-action: none; /* Утсан дээр дэлгэц скролл хийгдэхээс сэргийлнэ */
+            user-select: none;
+        }
+        body {
+            background-color: #0d1117;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            overflow: hidden;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+            color: #58a6ff;
+            text-align: center;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 2 / 3;
+        }
+        canvas {
+            background: #161b22;
+            border: 2px solid #30363d;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .instructions {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #8b949e;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Хавтан Хагалагч</h1>
+    <div id="game-container">
+        <canvas id="myCanvas"></canvas>
+    </div>
+    <div class="instructions">Хуруугаараа чирэх эсвэл хулганаар тавцанг удирдана уу.</div>
+
+    <script>
+        const canvas = document.getElementById("myCanvas");
+        const ctx = canvas.getContext("2d");
+        const container = document.getElementById("game-container");
+
+        // Дэлгэцийн харьцааг тохируулах
+        let CANVAS_WIDTH = 360;
+        let CANVAS_HEIGHT = 540;
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // Бөмбөгний үзүүлэлт
+        let ballRadius = 7;
+        let x = CANVAS_WIDTH / 2;
+        let y = CANVAS_HEIGHT - 40;
+        let dx = 3.5;
+        let dy = -3.5;
+
+        // Тавцангийн үзүүлэлт
+        let paddleHeight = 12;
+        let paddleWidth = 80;
+        let paddleX = (CANVAS_WIDTH - paddleWidth) / 2;
+
+        // Хавтангийн тохиргоо
+        let brickRowCount = 5;
+        let brickColumnCount = 5;
+        let brickWidth = 58;
+        let brickHeight = 16;
+        let brickPadding = 8;
+        let brickOffsetTop = 50;
+        let brickOffsetLeft = 18;
+        let colors = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93"];
+
+        let score = 0;
+        let lives = 3;
+
+        let bricks = [];
+        function initBricks() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                bricks[c] = [];
+                for (let r = 0; r < brickRowCount; r++) {
+                    bricks[c][r] = { x: 0, y: 0, status: 1, color: colors[r % colors.length] };
+                }
+            }
+        }
+        initBricks();
+
+        // Утсан дээр хуруугаар удирдах (Touch Events)
+        canvas.addEventListener("touchmove", handleTouch, { passive: false });
+        canvas.addEventListener("touchstart", handleTouch, { passive: false });
+        // Компьютер дээр хулганаар удирдах (Mouse Events)
+        canvas.addEventListener("mousemove", handleMouse);
+
+        function handleTouch(e) {
+            e.preventDefault();
+            let rect = canvas.getBoundingClientRect();
+            let touchX = e.touches[0].clientX - rect.left;
+            let scaleX = CANVAS_WIDTH / rect.width;
+            let canvasTouchX = touchX * scaleX;
+            
+            paddleX = canvasTouchX - paddleWidth / 2;
+            if (paddleX < 0) paddleX = 0;
+            if (paddleX + paddleWidth > CANVAS_WIDTH) paddleX = CANVAS_WIDTH - paddleWidth;
+        }
+
+        function handleMouse(e) {
+            let rect = canvas.getBoundingClientRect();
+            let mouseX = e.clientX - rect.left;
+            let scaleX = CANVAS_WIDTH / rect.width;
+            let canvasMouseX = mouseX * scaleX;
+            
+            paddleX = canvasMouseX - paddleWidth / 2;
+            if (paddleX < 0) paddleX = 0;
+            if (paddleX + paddleWidth > CANVAS_WIDTH) paddleX = CANVAS_WIDTH - paddleWidth;
+        }
+
+        // Чичиргээ үүсгэх туслах функц (Утсанд зориулсан)
+        function vibrate(ms) {
+            if (navigator.vibrate) {
+                navigator.vibrate(ms);
+            }
+        }
+
+        function collisionDetection() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    let b = bricks[c][r];
+                    if (b.status === 1) {
+                        if (x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
+                            dy = -dy;
+                            b.status = 0;
+                            score += 10;
+                            vibrate(30); // Хавтан хагарахад бага зэрэг чичрэх
+                            if (score === brickRowCount * brickColumnCount * 10) {
+                                alert("БАЯР ХҮРГЭЭЕ! Та яллаа!");
+                                document.location.reload();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.roundRect(paddleX, CANVAS_HEIGHT - paddleHeight - 10, paddleWidth, paddleHeight, 6);
+            ctx.fillStyle = "#58a6ff";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBricks() {
+            for (let c = 0; c < brickColumnCount; c++) {
+                for (let r = 0; r < brickRowCount; r++) {
+                    if (bricks[c][r].status === 1) {
+                        let brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+                        let brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+                        bricks[c][r].x = brickX;
+                        bricks[c][r].y = brickY;
+                        ctx.beginPath();
+                        ctx.roundRect(brickX, brickY, brickWidth, brickHeight, 4);
+                        ctx.fillStyle = bricks[c][r].color;
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        function drawScore() {
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillStyle = "#8b949e";
+            ctx.fillText("Оноо: " + score, 15, 25);
+        }
+
+        function drawLives() {
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillStyle = "#8b949e";
+            ctx.fillText("Амь: " + lives, CANVAS_WIDTH - 65, 25);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            drawBricks();
+            drawBall();
+            drawPaddle();
+            drawScore();
+            drawLives();
+            collisionDetection();
+
+            // Хана мөргөх
+            if (x + dx > CANVAS_WIDTH - ballRadius || x + dx < ballRadius) {
+                dx = -dx;
+            }
+            if (y + dy < ballRadius + 30) {
+                dy = -dy;
+            } else if (y + dy > CANVAS_HEIGHT - ballRadius - paddleHeight - 10) {
+                // Тавцан дээр ойх
+                if (x > paddleX && x < paddleX + paddleWidth) {
+                    dy = -Math.abs(dy);
+                    vibrate(15);
+                } else if (y + dy > CANVAS_HEIGHT - ballRadius) {
+                    lives--;
+                    vibrate(100);
+                    if (!lives) {
+                        alert("ХОЖИГДЛОО! Дахин туршаарай.");
+                        document.location.reload();
+                    } else {
+                        x = CANVAS_WIDTH / 2;
+                        y = CANVAS_HEIGHT - 40;
+                        dx = 3.5;
+                        dy = -3.5;
+                        paddleX = (CANVAS_WIDTH - paddleWidth) / 2;
+                    }
+                }
+            }
+
+            x += dx;
+            y += dy;
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>
