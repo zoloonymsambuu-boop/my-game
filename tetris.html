@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Tetris OOP Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #111827;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+    .header {
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 2rem;
+      letter-spacing: 2px;
+      color: #60a5fa;
+    }
+    .score-board {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #f3f4f6;
+    }
+    canvas {
+      border: 4px solid #374151;
+      border-radius: 8px;
+      background-color: #000;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    .btn {
+      background: #1f2937;
+      color: #fff;
+      border: 2px solid #374151;
+      padding: 15px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.1s;
+    }
+    .btn:active {
+      background: #3b82f6;
+    }
+    .btn-rotate {
+      grid-column: span 3;
+      background: #2563eb;
+      border-color: #3b82f6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="game-container">
+    <div class="header">
+      <h1>TETRIS</h1>
+      <div class="score-board">Оноо: <span id="score">0</span></div>
+    </div>
+
+    <canvas id="tetris" width="240" height="400"></canvas>
+
+    <div class="controls">
+      <div class="btn btn-rotate" id="btn-rotate">↻ ЭРГҮҮЛЭХ</div>
+      <div class="btn" id="btn-left">◀</div>
+      <div class="btn" id="btn-down">▼</div>
+      <div class="btn" id="btn-right">▶</div>
+    </div>
+  </div>
+
+  <script>
+    const CANVAS = document.getElementById('tetris');
+    const CTX = CANVAS.getContext('2d');
+    const SCORE_ELEMENT = document.getElementById('score');
+
+    const COLS = 10;
+    const ROWS = 20;
+    const BLOCK_SIZE = 24;
+
+    // Дүрсүүдийн загвар болон өнгө
+    const SHAPES = [
+      [],
+      [[1, 1, 1, 1]], // I
+      [[1, 0, 0], [1, 1, 1]], // J
+      [[0, 0, 1], [1, 1, 1]], // L
+      [[1, 1], [1, 1]], // O
+      [[0, 1, 1], [1, 1, 0]], // S
+      [[0, 1, 0], [1, 1, 1]], // T
+      [[1, 1, 0], [0, 1, 1]]  // Z
+    ];
+
+    const COLORS = [
+      null,
+      '#00f0f0', // Cyan
+      '#0000f0', // Blue
+      '#f0a000', // Orange
+      '#f0f000', // Yellow
+      '#00f000', // Green
+      '#a000f0', // Purple
+      '#f00000'  // Red
+    ];
+
+    // --- 1. PIECE CLASS (ДҮРС) ---
+    class Piece {
+      constructor(typeId) {
+        this.typeId = typeId;
+        this.shape = SHAPES[typeId];
+        this.color = COLORS[typeId];
+        this.x = Math.floor(COLS / 2) - Math.ceil(this.shape[0].length / 2);
+        this.y = 0;
+      }
+
+      rotate() {
+        const transposed = this.shape[0].map((_, colIndex) =>
+          this.shape.map(row => row[colIndex])
+        );
+        this.shape = transposed.map(row => row.reverse());
+      }
+    }
+
+    // --- 2. BOARD CLASS (ТАЛБАЙ) ---
+    class Board {
+      constructor() {
+        this.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      }
+
+      isValidMove(piece, offsetX = 0, offsetY = 0, newShape = null) {
+        const shape = newShape || piece.shape;
+        for (let r = 0; r < shape.length; r++) {
+          for (let c = 0; c < shape[r].length; c++) {
+            if (shape[r][c] !== 0) {
+              let newX = piece.x + c + offsetX;
+              let newY = piece.y + r + offsetY;
+
+              if (newX < 0 || newX >= COLS || newY >= ROWS) return false;
+              if (newY >= 0 && this.grid[newY][newX] !== 0) return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      lockPiece(piece) {
+        piece.shape.forEach((row, r) => {
+          row.forEach((value, c) => {
+            if (value !== 0) {
+              this.grid[piece.y + r][piece.x + c] = piece.typeId;
+            }
+          });
+        });
+      }
+
+      clearLines() {
+        let linesCleared = 0;
+        for (let r = ROWS - 1; r >= 0; r--) {
+          if (this.grid[r].every(value => value !== 0)) {
+            this.grid.splice(r, 1);
+            this.grid.unshift(Array(COLS).fill(0));
+            linesCleared++;
+            r++; // Массив дээшээ шилжсэн тул дахин шалгана
+          }
+        }
+        return linesCleared;
+      }
+
+      draw() {
+        this.grid.forEach((row, r) => {
+          row.forEach((value, c) => {
+            if (value > 0) {
+              CTX.fillStyle = COLORS[value];
+              CTX.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+            }
+          });
+        });
+      }
+    }
+
+    // --- 3. GAME CLASS (ТОГЛООМ УДИРДЛАГА) ---
+    class Game {
+      constructor() {
+        this.board = new Board();
+        this.activePiece = this.spawnPiece();
+        this.score = 0;
+        this.gameOver = false;
+        this.dropCounter = 0;
+        this.dropInterval = 800; // Буух хурд (мс)
+        this.lastTime = 0;
+
+        this.initControls();
+      }
+
+      spawnPiece() {
+        const id = Math.floor(Math.random() * 7) + 1;
+        return new Piece(id);
+      }
+
+      update(time = 0) {
+        if (this.gameOver) return;
+
+        const deltaTime = time - this.lastTime;
+        this.lastTime = time;
+        this.dropCounter += deltaTime;
+
+        if (this.dropCounter > this.dropInterval) {
+          this.moveDown();
+        }
+
+        this.draw();
+        requestAnimationFrame(this.update.bind(this));
+      }
+
+      moveDown() {
+        if (this.board.isValidMove(this.activePiece, 0, 1)) {
+          this.activePiece.y++;
+        } else {
+          this.board.lockPiece(this.activePiece);
+          const cleared = this.board.clearLines();
+          if (cleared > 0) {
+            this.score += cleared * 100;
+            SCORE_ELEMENT.innerText = this.score;
+          }
+
+          this.activePiece = this.spawnPiece();
+          if (!this.board.isValidMove(this.activePiece)) {
+            this.gameOver = true;
+            alert(`GAME OVER! Таны оноо: ${this.score}`);
+          }
+        }
+        this.dropCounter = 0;
+      }
+
+      moveLeft() {
+        if (this.board.isValidMove(this.activePiece, -1, 0)) {
+          this.activePiece.x--;
+        }
+      }
+
+      moveRight() {
+        if (this.board.isValidMove(this.activePiece, 1, 0)) {
+          this.activePiece.x++;
+        }
+      }
+
+      rotatePiece() {
+        const dummyPiece = new Piece(this.activePiece.typeId);
+        dummyPiece.shape = this.activePiece.shape;
+        dummyPiece.rotate();
+
+        if (this.board.isValidMove(this.activePiece, 0, 0, dummyPiece.shape)) {
+          this.activePiece.rotate();
+        }
+      }
+
+      draw() {
+        CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+        this.board.draw();
+
+        // Одоо бууж буй дүрсийг зурах
+        if (this.activePiece) {
+          CTX.fillStyle = this.activePiece.color;
+          this.activePiece.shape.forEach((row, r) => {
+            row.forEach((value, c) => {
+              if (value !== 0) {
+                CTX.fillRect(
+                  (this.activePiece.x + c) * BLOCK_SIZE,
+                  (this.activePiece.y + r) * BLOCK_SIZE,
+                  BLOCK_SIZE - 1,
+                  BLOCK_SIZE - 1
+                );
+              }
+            });
+          });
+        }
+      }
+
+      initControls() {
+        // Компьютерийн гарны удирдлага
+        document.addEventListener('keydown', event => {
+          if (this.gameOver) return;
+          if (event.key === 'ArrowLeft') this.moveLeft();
+          else if (event.key === 'ArrowRight') this.moveRight();
+          else if (event.key === 'ArrowDown') this.moveDown();
+          else if (event.key === 'ArrowUp') this.rotatePiece();
+        });
+
+        // Дэлгэцийн товчлуурын удирдлага (Mobile)
+        document.getElementById('btn-left').onclick = () => this.moveLeft();
+        document.getElementById('btn-right').onclick = () => this.moveRight();
+        document.getElementById('btn-down').onclick = () => this.moveDown();
+        document.getElementById('btn-rotate').onclick = () => this.rotatePiece();
+      }
+    }
+
+    // Тоглоомыг эхлүүлэх
+    const game = new Game();
+    game.update();
+  </script>
+
+</body>
+</html>
